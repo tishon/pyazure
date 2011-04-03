@@ -1,0 +1,27 @@
+- add tests
+- add insert entity to table storage operations
+- add update entity to table storage operations
+- add get queue metadata to queue operations
+- add set queue metadata to queue operations
+- add peek messages to queue operations
+- add clear messages to queue operations
+- add get container properties to blob operations
+- add get container metadata to blob properties
+- add set container metadata to blob operations
+- add get container ACL to blob operations
+- add set container ACL to blob operations
+- add get blob properties to blob operations
+- add set blob properties to blob operations
+- add get blob metadata to blob operations
+- add set blob metadata to blob operations
+- add lease blob to blob operations
+- add snapshot blob to blob operations
+- add copy blob to blob operations
+- add put block to blob operations
+- add put block list to blob operations
+- add get block list to blob operations
+- add put page to blob operations
+- add get page regions to blob operations
+- general refactoring
+- create install script
+- wrap service management API

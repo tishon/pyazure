@@ -1,0 +1,12 @@
+Python wrapper around Windows Azure storage and management APIs
+
+Based on Sriram Krishnan's original work:
+http://www.sriramkrishnan.com/blog/2008/11/python-wrapper-for-windows-azure.html
+
+Project structure and delete blob operation borrowed from @livenson:
+https://github.com/livenson/winazurestorage/tree/9ed4f0f5e764c3f0086c49dfa9acfde42091c131
+
+There is a project with the same name on Google Code, but it seems abandoned:
+http://code.google.com/p/pyazure/
+
+
