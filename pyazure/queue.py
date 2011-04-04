@@ -35,6 +35,12 @@ from util import *
 
 class QueueMessage(): pass
 
+class Queue(object):
+    def __init__(self, name="", url="", metadata=None):
+        self.name = name
+        self.url = url
+        self.metadata = metadata
+
 class QueueStorage(Storage):
     def __init__(self, host, account_name, secret_key, use_path_style_uris = None):
         super(QueueStorage, self).__init__(host, account_name, secret_key, use_path_style_uris)
@@ -57,7 +63,30 @@ class QueueStorage(Storage):
             return response.code
         except URLError, e:
             return e.code
-            
+    
+    def list_queues(self, prefix=None, marker=None, maxresults=None,
+                    include_metadata=False):
+        request_string = self.get_base_url() + "/?comp=list"
+        if prefix:
+            request_string = add_url_parameter(request_string, "prefix", prefix)
+        if marker:
+            request_string = add_url_parameter(request_string, "marker", marker)
+        if maxresults:
+            request_string = add_url_parameter(request_string, "maxresults",
+                                               maxresults)
+        if include_metadata:
+            request_string = add_url_parameter(request_string, "include",
+                                               "metadata")
+        req = Request(request_string)
+        req = self._credentials.sign_request(req)
+        response = urlopen(req).read()
+        
+        dom = etree.fromstring(response)
+        entries = dom.findall(".//Queue")
+        next_marker = dom.find(".//NextMarker").text
+        parsed_queues = [self._parse_queue(e) for e in entries]
+        return dict(next_marker=next_marker, queues=parsed_queues)
+    
     def put_message(self, queue_name, payload):
         data = "<QueueMessage><MessageText>%s</MessageText></QueueMessage>" % base64.encodestring(payload)
         req = RequestWithMethod("POST", "%s/%s/messages" % (self.get_base_url(), queue_name), data=data)
@@ -95,3 +124,16 @@ class QueueStorage(Storage):
             return response.code
         except URLError, e:
             return e.code
+    
+    def _parse_queue(self, entry):
+        queue = Queue()
+        queue.name = entry.find("QueueName").text
+        queue.url = entry.find("Url").text
+        metadata = entry.find("Metadata")
+        if metadata:
+            parsed_meta = {}
+            for m in metadata.getchildren():
+                if not parsed_meta.has_key(m.tag):
+                    parsed_meta[m.tag] = m.text
+            queue.metadata = parsed_meta
+        return queue
