@@ -72,7 +72,8 @@ class TableStorage(Storage):
             return e.code
 
     def delete_table(self, name):
-        req = RequestWithMethod("DELETE", "%s/Tables('%s')" % (self.get_base_url(), name))
+        req = RequestWithMethod("DELETE", "%s/Tables('%s')" % \
+                                (self.get_base_url(), name))
         self._credentials.sign_table_request(req)
         try:
             response = urlopen(req)
@@ -81,20 +82,21 @@ class TableStorage(Storage):
             return e.code
 
     def list_tables(self):
-        req = Request("%s/Tables" % self.get_base_url())
-        self._credentials.sign_table_request(req)
-        response = urlopen(req).read()
+        request_necessary = True
+        next_table_name = None
+        request_string = "%s/Tables" % self.get_base_url()
         
-        dom = etree.fromstring(response)
-        entries = dom.findall(TAGS_ATOM_ENTRY)
-
-        for entry in entries:
-            table_url = entry.find(TAGS_ATOM_ID).text
-            table_name = entry.find('.//' + TAGS_D_TABLENAME).text
-            yield Table(table_url, table_name)
+        while request_necessary:
+            request = self._get_tables_request(request_string, next_table_name)
+            request_necessary, next_table_name =\
+                self._get_tables_continuation_token(request)
+            
+            for table in self._get_tables(request):
+                yield table
 
     def get_entity(self, table_name, partition_key, row_key):
-        request_object = Request("%s/%s(PartitionKey='%s',RowKey='%s')" % (self.get_base_url(), table_name, partition_key, row_key))
+        request_object = Request("%s/%s(PartitionKey='%s',RowKey='%s')" % \ 
+            (self.get_base_url(), table_name, partition_key, row_key))
         request = self._get_signed_request(request_object)
         response = request.read()
         dom = etree.fromstring(response)
@@ -122,10 +124,10 @@ class TableStorage(Storage):
         next_row_key = None
         
         while request_necessary:
-            request = self._get_request(request_string, next_partition_key,
-                                        next_row_key)
+            request = self._get_entities_request(request_string,
+                        next_partition_key, next_row_key)
             request_necessary, next_partition_key, next_row_key =\
-                self._get_continuation_tokens(request)
+                self._get_entities_continuation_tokens(request)
             if "$top" in request_string:
                 request_necessary = False
             
@@ -133,16 +135,26 @@ class TableStorage(Storage):
                 yield entity
 
     def delete_entity(self, table_name, partition_key, row_key):
-        request_object = Request("DELETE", "%s/%s(PartitionKey='%s',RowKey='%s')" % (self.get_base_url(), table_name, partition_key, row_key))
+        request_string = "%s/%s(PartitionKey='%s',RowKey='%s')" % \
+            (self.get_base_url(), table_name, partition_key, row_key)
+        request_object = Request("DELETE",request_string)
         request = self._get_signed_request(request_object)
 
-    def _get_request(self, request_string, next_partition_key, next_row_key):
+    def _get_entities_request(self, request_string, next_partition_key,
+                              next_row_key):
         if next_partition_key:
             request_string = add_url_parameter(request_string, "NextPartitionKey",
                 next_partition_key)
         if next_row_key:
             request_string = add_url_parameter(request_string, "NextRowKey",
                 next_row_key)
+        request_object = Request(request_string)
+        return self._get_signed_request(request_object)
+
+    def _get_tables_request(self, request_string, next_table_name):
+        if next_table_name:
+            request_string = add_url_parameter(request_string, "NextTableName",
+                                               next_table_name)
         request_object = Request(request_string)
         return self._get_signed_request(request_object)
 
@@ -162,6 +174,16 @@ class TableStorage(Storage):
             self._parse_property(entity, property)
         return entity
 
+    def _get_tables(self, request):
+        response = request.read()
+        dom = etree.fromstring(response)
+        return [self._parse_table(t) for t in dom.findall(TAGS_ATOM_ENTRY)]
+    
+    def _parse_table(self, entry):
+        table_url = entry.find(TAGS_ATOM_ID).text
+        table_name = entry.find('.//' + TAGS_D_TABLENAME).text
+        return Table(table_url, table_name)
+
     def _parse_property(self, entity, property):
         key = get_tag_name_without_namespace(property.tag)
         if property.get(ATTRIBUTES_M_TYPE):
@@ -175,7 +197,8 @@ class TableStorage(Storage):
             value = property.text
         setattr(entity, key, value)
     
-    def _get_continuation_tokens(self, response):
+    def _get_entities_continuation_tokens(self, response):
+        """Returns continuation tokens for table entity queries"""
         # set default values
         request_necessary, next_partition_key, next_row_key = True, None, None
         
@@ -187,3 +210,14 @@ class TableStorage(Storage):
             if HEADERS_NEXTROWKEY in response.headers.keys():
                 next_row_key = response.headers[HEADERS_NEXTROWKEY]
         return (request_necessary, next_partition_key, next_row_key)
+    
+    def _get_tables_continuation_token(self, response):
+        """Returns continuation token for table queries"""
+        request_necessary = True
+        next_table_name = None
+        
+        if HEADERS_NEXTTABLENAME not in response.headers.keys():
+            request_necessary = False
+        else:
+            next_table_name = request.headers[HEADERS_NEXTTABLENAME]
+        return (request_necessary, next_table_name)

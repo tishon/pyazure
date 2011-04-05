@@ -1,4 +1,4 @@
-Python wrapper around Windows Azure storage and management APIs
+Python wrapper around Windows Azure storage and management REST APIs
 
 Based on Sriram Krishnan's original work:
 http://www.sriramkrishnan.com/blog/2008/11/python-wrapper-for-windows-azure.html

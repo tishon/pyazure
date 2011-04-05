@@ -59,6 +59,7 @@ TIME_FORMAT ="%a, %d %b %Y %H:%M:%S %Z"
 # HTTP headers needed for the continuation tokens in the Table storage API
 HEADERS_NEXTPARTITIONKEY = PREFIX_STORAGE_HEADER + "continuation-nextpartitionkey"
 HEADERS_NEXTROWKEY = PREFIX_STORAGE_HEADER + "continuation-nextrowkey"
+HEADERS_NEXTTABLENAME = PREFIX_STORAGE_HEADER + "continuation-nexttablename"
 
 # Namespaces needed for parsing XML responses with lxml
 NAMESPACE_M = "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata"
@@ -72,7 +73,6 @@ TAGS_ATOM_ID = "{%s}id" % NAMESPACE_ATOM
 TAGS_ATOM_CONTENT = "{%s}content" % NAMESPACE_ATOM
 TAGS_ATOM_ENTRY = "{%s}entry" % NAMESPACE_ATOM
 TAGS_ATOM_QUEUEMESSAGE = "{%s}QueueMessage" % NAMESPACE_ATOM
-TAGS_ATOM_QUEUE = "{%s}Queue" % NAMESPACE_ATOM
 TAGS_ATOM_MESSAGEID = "{%s}MessageId" % NAMESPACE_ATOM
 TAGS_ATOM_POPRECEIPT = "{%s}PopReceipt" % NAMESPACE_ATOM
 TAGS_ATOM_MESSAGETEXT = "{%s}MessageText" % NAMESPACE_ATOM
