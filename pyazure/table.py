@@ -95,7 +95,7 @@ class TableStorage(Storage):
                 yield table
 
     def get_entity(self, table_name, partition_key, row_key):
-        request_object = Request("%s/%s(PartitionKey='%s',RowKey='%s')" % \ 
+        request_object = Request("%s/%s(PartitionKey='%s',RowKey='%s')" % \
             (self.get_base_url(), table_name, partition_key, row_key))
         request = self._get_signed_request(request_object)
         response = request.read()

@@ -28,6 +28,7 @@ License:
 """
 
 import base64
+import time
 from lxml import etree
 from urllib2 import Request, urlopen, URLError
 
@@ -86,7 +87,22 @@ class QueueStorage(Storage):
         next_marker = dom.find(".//NextMarker").text
         parsed_queues = [self._parse_queue(e) for e in entries]
         return dict(next_marker=next_marker, queues=parsed_queues)
-    
+
+    def clear_messages(self, queue_name, retry_on_errors=True,
+            number_of_retries=3, retry_sleep_time=2):
+        sent_requests = 0
+        
+        while True:
+            result = self._clear_messages(queue_name)
+            sent_requests += 1
+            if result == 204:
+                return result
+            elif retry_on_errors and sent_requests <= number_of_retries:
+                time.sleep(retry_sleep_time)
+                continue
+            else:
+                return result
+
     def put_message(self, queue_name, payload):
         data = "<QueueMessage><MessageText>%s</MessageText></QueueMessage>" % base64.encodestring(payload)
         req = RequestWithMethod("POST", "%s/%s/messages" % (self.get_base_url(), queue_name), data=data)
@@ -137,3 +153,21 @@ class QueueStorage(Storage):
                     parsed_meta[m.tag] = m.text
             queue.metadata = parsed_meta
         return queue
+    
+    def _clear_messages(self, queue_name):
+        request_string = self.get_base_url() + "/" + queue_name + "/messages"
+        req = RequestWithMethod("DELETE", request_string)
+        req = self._credentials.sign_request(req)
+        try:
+            response = urlopen(req)
+            # A successful operation returns status code 204 (No Content)
+            return response.code
+        except URLError, e:
+            # If a queue contains a large number of messages, ClearMessages()
+            # may time out before all messages have been deleted. In this case
+            # the Queue service will return status code 500 (Internal Server
+            # Error), with the additional error code OperationTimedOut. If the
+            # operation times out, the client should continue to retry Clear
+            # Messages until it succeeds, to ensure that all messages have been
+            # deleted.
+            return e.code
