@@ -28,7 +28,10 @@ License:
 """
 
 import time
-from lxml import etree
+try:
+    from lxml import etree
+except ImportError:
+    from xml.etree import ElementTree as etree
 from urllib2 import Request, urlopen, URLError
 
 from util import *
@@ -47,8 +50,10 @@ class TableEntity(object):
 class TableStorage(Storage):
     '''Due to local development storage not supporting SharedKey authentication, this class
        will only work against cloud storage.'''
-    def __init__(self, host, account_name, secret_key, use_path_style_uris = None):
-        super(TableStorage, self).__init__(host, account_name, secret_key, use_path_style_uris)
+    def __init__(self, host, account_name, secret_key,
+            use_path_style_uris=None):
+        super(TableStorage, self).__init__(host, account_name, secret_key,
+            use_path_style_uris)
 
     def create_table(self, name):
         data = """<?xml version="1.0" encoding="utf-8" standalone="yes"?>

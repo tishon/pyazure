@@ -7,6 +7,7 @@ Authors:
     Sriram Krishnan <sriramk@microsoft.com>
     Steve Marx <steve.marx@microsoft.com>
     Tihomir Petkov <tpetkov@gmail.com>
+    Blair Bethwaite <blair.bethwaite@gmail.com>
 
 License:
     GNU General Public Licence (GPL)
@@ -29,7 +30,10 @@ License:
 
 import base64
 import time
-from lxml import etree
+try:
+    from lxml import etree
+except ImportError:
+    from xml.etree import ElementTree as etree
 from urllib2 import Request, urlopen, URLError
 
 from util import *
@@ -43,8 +47,10 @@ class Queue(object):
         self.metadata = metadata
 
 class QueueStorage(Storage):
-    def __init__(self, host, account_name, secret_key, use_path_style_uris = None):
-        super(QueueStorage, self).__init__(host, account_name, secret_key, use_path_style_uris)
+    def __init__(self, host, account_name, secret_key,
+            use_path_style_uris=None):
+        super(QueueStorage, self).__init__(host, account_name, secret_key,
+            use_path_style_uris)
 
     def create_queue(self, name):
         req = RequestWithMethod("PUT", "%s/%s" % (self.get_base_url(), name))
@@ -80,13 +86,41 @@ class QueueStorage(Storage):
                                                "metadata")
         req = Request(request_string)
         req = self._credentials.sign_request(req)
-        response = urlopen(req).read()
-        
-        dom = etree.fromstring(response)
+        response = urlopen(req)
+        dom = etree.fromstring(response.read())
         entries = dom.findall(".//Queue")
         next_marker = dom.find(".//NextMarker").text
         parsed_queues = [self._parse_queue(e) for e in entries]
         return dict(next_marker=next_marker, queues=parsed_queues)
+
+    def get_queue_metadata(self, queue_name):
+        req = RequestWithMethod("HEAD", "%s/%s?comp=metadata" %
+            (self.get_base_url(), queue_name))
+        self._credentials.sign_request(req)
+        try:
+            response = urlopen(req)
+        except URLError, e:
+            return e.code
+        approx_msg_count = response.headers.getheader(
+            'x-ms-approximate-messages-count')
+        metadata = {}
+        for k,v in zip(response.headers.keys(), response.headers.values()):
+            if k.startswith('x-ms-meta-') and not metadata.has_key(k[10:]):
+                metadata[k[10:]] = v
+        return (approx_msg_count, metadata)
+
+    def set_queue_metadata(self, queue_name, metadata={}):
+        req = RequestWithMethod("PUT", "%s/%s?comp=metadata" %
+            (self.get_base_url(), queue_name))
+        req.add_header("Content-Length", "0")
+        for k,v in metadata.iteritems():
+            req.add_header("x-ms-meta-"+unicode(k), unicode(v))
+        self._credentials.sign_request(req)
+        try:
+            response = urlopen(req)
+        except URLError, e:
+            return e.code
+        return response.code
 
     def clear_messages(self, queue_name, retry_on_errors=True,
             number_of_retries=3, retry_sleep_time=2):
@@ -120,14 +154,15 @@ class QueueStorage(Storage):
         self._credentials.sign_request(req)
         response = urlopen(req)
         dom = etree.fromstring(response.read())
-        messages = dom.findall(TAGS_ATOM_QUEUEMESSAGE)
+        messages = dom.findall('QueueMessage')
         result = None
         if len(messages) == 1:
             message = messages[0]
             result = QueueMessage()
-            result.id = message.find(TAGS_ATOM_MESSAGEID).text
-            result.pop_receipt = message.find(TAGS_ATOM_POPRECEIPT).text
-            result.text = base64.decodestring(message.find(TAGS_ATOM_MESSAGETEXT).text)
+            result.id = message.find('MessageId').text
+            result.pop_receipt = message.find('PopReceipt').text
+            result.text = base64.decodestring(
+                message.find('MessageText').text)
         return result
 
     def delete_message(self, queue_name, message):

@@ -28,13 +28,17 @@ License:
 """
 
 import time
-from lxml import etree
+try:
+    from lxml import etree
+except ImportError:
+    from xml.etree import ElementTree as etree
 from urllib2 import Request, urlopen, URLError
 
 from util import *
 
 class BlobStorage(Storage):
-    def __init__(self, host, account_name, secret_key, use_path_style_uris):
+    def __init__(self, host, account_name, secret_key,
+            use_path_style_uris=None):
         super(BlobStorage, self).__init__(host, account_name, secret_key,
                                           use_path_style_uris)
 
@@ -61,8 +65,9 @@ class BlobStorage(Storage):
     def list_containers(self):
         req = Request("%s/?comp=list" % self.get_base_url())
         self._credentials.sign_request(req)
-        dom = etree.fromstring(urlopen(req).read())
-        containers = dom.findall("Container")
+        #dom = etree.fromstring(urlopen(req).read())
+        dom = etree.parse(urlopen(req))
+        containers = dom.findall(".//Container")
         for container in containers:
             container_name = container.find("Name").text
             etag = container.find("Etag").text
@@ -70,10 +75,10 @@ class BlobStorage(Storage):
             yield (container_name, etag, last_modified)
 
     def list_blobs(self, container_name):
-        req = Request("%s/$s?comp=list" % (self.get_base_url(), container_name))
+        req = Request("%s/%s?comp=list" % (self.get_base_url(), container_name))
         self._credentials.sign_request(req)
         dom = etree.fromstring(urlopen(req).read())
-        containers = dom.findall("Blob")
+        containers = dom.findall(".//Blob")
         for container in containers:
             container_name = container.find("Name").text
             etag = container.find("Etag").text
@@ -85,6 +90,9 @@ class BlobStorage(Storage):
         req.add_header("Content-Length", "%d" % len(data))
         if content_type is not None:
             req.add_header("Content-Type", content_type)
+        else:
+            # urllib2 has dubious content-type meddling behaviour
+            req.add_header("Content-Type", "")
         self._credentials.sign_request(req)
         try:
             response = urlopen(req)
