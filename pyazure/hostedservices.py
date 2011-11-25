@@ -33,8 +33,6 @@ import httplib
 import base64
 from xml.dom import minidom
 import time
-import logging
-logging.basicConfig(level=logging.DEBUG)
 import os.path
 from StringIO import StringIO
 try:
@@ -49,7 +47,7 @@ from locations import Locations
 class HostedServices(ServiceManagementEndpoint):
     
     def __init__(self, management_cert_path, subscription_id):
-        logging.debug("init hosted service")
+        log.debug("init hosted service")
         self.wasm_ops = self.get_wasm_ops()
         self._locations = None
         self.last_response_data = None
@@ -86,37 +84,40 @@ class HostedServices(ServiceManagementEndpoint):
             self.change_deployment_configuration,
         ]
 
-    def list_services(self):        
+    def list_services(self, just_names=True):
         """The List Hosted Services operation lists the hosted services
         available under the current subscription."""
 
-        logging.debug('Getting hosted services list')
+        log.debug('Getting hosted services list')
         req = RequestWithMethod('GET', self.base_url)
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.OK:
             self._raise_wa_error(res)
         ET = etree.parse(res)
         services = ET.findall('.//{%s}HostedService' % NAMESPACE_MANAGEMENT)
         for service in services:
-            url = service.findtext('{%s}Url' % NAMESPACE_MANAGEMENT)
             service_name = service.findtext('{%s}ServiceName'
                 % NAMESPACE_MANAGEMENT)
-            yield {'Url':url, 'ServiceName':service_name}
+            if just_names:
+                yield service_name
+            else:
+                url = service.findtext('{%s}Url' % NAMESPACE_MANAGEMENT)
+                yield {'Url':url, 'ServiceName':service_name}
 
     def delete_service(self, service_name):
         """The Delete Hosted Service operation deletes the specified hosted
         service from Windows Azure."""
 
-        logging.debug('Deleting hosted service: %s', service_name)
+        log.debug('Deleting hosted service: %s', service_name)
         req = RequestWithMethod('DELETE', '%s/%s' % (self.base_url,
             service_name))
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.OK:
             self._raise_wa_error(res)
         request_id = res.headers.getheader('x-ms-request-id')
-        logging.debug('Request-Id: %s', request_id)
+        log.debug('Request-Id: %s', request_id)
         return True
 
     def update_service(self):
@@ -127,7 +128,7 @@ class HostedServices(ServiceManagementEndpoint):
         """The Create Hosted Service operation creates a new hosted service
         in Windows Azure."""
 
-        logging.debug('Creating hosted service: %s', service_name)
+        log.debug('Creating hosted service: %s', service_name)
         if not label:
             raise ValueError(label,'label must be set')
         if len(label) > 100:
@@ -150,11 +151,11 @@ class HostedServices(ServiceManagementEndpoint):
         req_body = OrderedDict([('CreateHostedService',req_body)])
         req.add_data(build_wasm_request_body(req_body))
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.CREATED:
             self._raise_wa_error(res)
         request_id = res.headers.getheader('x-ms-request-id')
-        logging.debug('Request-Id: %s' % request_id)
+        log.debug('Request-Id: %s' % request_id)
         return True
 
     def get_service_properties(self, service_name, embed_detail=False):
@@ -165,7 +166,7 @@ class HostedServices(ServiceManagementEndpoint):
         affinity group; and optionally, information on the service's
         deployments."""
         
-        logging.debug('Getting hosted service info: %s', service_name)
+        log.debug('Getting hosted service info: %s', service_name)
         if embed_detail:
             req = RequestWithMethod('GET', '%s/%s?embed-detail=true'
                 % (self.base_url, service_name))
@@ -176,11 +177,11 @@ class HostedServices(ServiceManagementEndpoint):
         if res.code != httplib.OK:
             self._raise_wa_error(res)
         service = etree.parse(res)
-        info = {}
+        info = OrderedDict()
         info['Url'] = service.findtext('.//{%s}Url' % NAMESPACE_MANAGEMENT)
         info['ServiceName'] = service.findtext('.//{%s}ServiceName'
             % NAMESPACE_MANAGEMENT)
-        props = {}
+        props = OrderedDict()
         info['HostedServiceProperties'] = props
         props['Description'] = service.findtext('.//{%s}Description'
             % NAMESPACE_MANAGEMENT)
@@ -241,21 +242,21 @@ class HostedServices(ServiceManagementEndpoint):
         if res.code != httplib.ACCEPTED:
             self._raise_wa_error(res)
         request_id = res.headers.getheader('x-ms-request-id')
-        logging.debug('Request-Id: %s', request_id)
+        log.debug('Request-Id: %s', request_id)
         return request_id
     
     def get_deployment(self, service_name, name):
         """The Get Deployment operation returns configuration information,
         status, and system properties for a deployment."""
 
-        logging.debug('Getting deployment info: %s - %s', service_name, name)
+        log.debug('Getting deployment info: %s - %s', service_name, name)
         req = RequestWithMethod('GET', '%s/%s/deployments/%s'
             % (self.base_url, service_name, name))
         res = self.urlopen(req)
         self.last_response_data = res.read()
         res.fp = StringIO(self.last_response_data)
         res.read = res.fp.read
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.OK:
             self._raise_wa_error(res)
         deployment = etree.parse(res)
@@ -266,7 +267,7 @@ class HostedServices(ServiceManagementEndpoint):
         from sub-elements and return them as a dict."""
 
         de = deployment_element
-        info = {}
+        info = OrderedDict()
         info['Name'] = de.findtext('.//{%s}Name' % NAMESPACE_MANAGEMENT)
         info['DeploymentSlot'] = de.findtext('.//{%s}DeploymentSlot'
             % NAMESPACE_MANAGEMENT)
@@ -282,7 +283,7 @@ class HostedServices(ServiceManagementEndpoint):
             % NAMESPACE_MANAGEMENT)
         info['RoleInstanceList'] = []
         for ri in role_instances:
-            ri_info = {}
+            ri_info = OrderedDict()
             ri_info['RoleName'] = ri.findtext('.//{%s}RoleName'
                 % NAMESPACE_MANAGEMENT)
             ri_info['InstanceName'] = de.findtext('.//{%s}InstanceName'
@@ -314,7 +315,7 @@ class HostedServices(ServiceManagementEndpoint):
         roles = de.findall('.//{%s}Role' % MANAGEMENT_VERSION)
         info['RoleList'] = []
         for role in roles:
-            role_info = {}
+            role_info = OrderedDict()
             role_info['RoleName'] = role.findtext('.//{%s}RoleName'
                 % NAMESPACE_MANAGEMENT)
             role_info['OsVersion'] = role.findtext('.//{%s}OsVersion'
@@ -326,7 +327,7 @@ class HostedServices(ServiceManagementEndpoint):
             % MANAGEMENT_VERSION)
         info['InputEndpointList'] = []
         for endpoint in input_endpoints:
-            endpoint_info = {}
+            endpoint_info = OrderedDict()
             endpoint_info['RoleName'] = endpoint.findtext('.//{%s}RoleName'
                 % NAMESPACE_MANAGEMENT)
             endpoint_info['Vip'] = endpoint.findtext('.//{%s}Vip'
@@ -346,7 +347,7 @@ class HostedServices(ServiceManagementEndpoint):
         """The Delete Deployment (async-)operation deletes the specified
         deployment."""
 
-        logging.debug('Deleting deployment: %s - %s', service_name,
+        log.debug('Deleting deployment: %s - %s', service_name,
             deployment_slot_or_name)
         if deployment_slot_or_name in ('staging','production'):
             req = RequestWithMethod('DELETE', '%s/%s/deploymentslots/%s'
@@ -355,11 +356,11 @@ class HostedServices(ServiceManagementEndpoint):
             req = RequestWithMethod('DELETE', '%s/%s/deployments/%s'
                 % (self.base_url, service_name, deployment_slot_or_name))
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.ACCEPTED:
             self._raise_wa_error(res)
         request_id = res.headers.getheader('x-ms-request-id')
-        logging.debug('Request-Id: %s', request_id)
+        log.debug('Request-Id: %s', request_id)
         return request_id
 
     def change_deployment_configuration(self, service_name,
@@ -372,7 +373,7 @@ class HostedServices(ServiceManagementEndpoint):
         operation. To determine whether the Management service has finished
         processing the request, call Get Operation Status."""
 
-        logging.debug('Changing deployment config: %s - %s',
+        log.debug('Changing deployment config: %s - %s',
             service_name, deployment_slot_or_name)
         if mode.lower() not in ('auto','manual'):
             raise ValueError(mode, 'mode must be "Auto" or "Manual"')
@@ -402,11 +403,11 @@ class HostedServices(ServiceManagementEndpoint):
         req_body = OrderedDict([('ChangeConfiguration',req_body)])
         req.add_data(build_wasm_request_body(req_body))
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.ACCEPTED:
             self._raise_wa_error(res)
         request_id = res.headers.getheader('x-ms-request-id')
-        logging.debug('Request-Id: %s', request_id)
+        log.debug('Request-Id: %s', request_id)
         return request_id
 
     def update_deployment_status(self, service_name, deployment_slot_or_name,
@@ -420,7 +421,7 @@ class HostedServices(ServiceManagementEndpoint):
             status = 'Suspended'
         else: # invalid status
             raise ValueError(status, 'status must be "Running" or "Suspended"')
-        logging.debug('Updating deployment: %s - %s to %s',
+        log.debug('Updating deployment: %s - %s to %s',
             service_name, deployment_slot_or_name, status)
         if deployment_slot_or_name.lower() in ('staging','production'):
             req = RequestWithMethod('POST',
@@ -435,11 +436,11 @@ class HostedServices(ServiceManagementEndpoint):
         req_body = OrderedDict([('UpdateDeploymentStatus',req_body)])
         req.add_data(build_wasm_request_body(req_body))
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.ACCEPTED:
             self._raise_wa_error(res)
         request_id = res.headers.getheader('x-ms-request-id')
-        logging.debug('Request-Id: %s', request_id)
+        log.debug('Request-Id: %s', request_id)
         return request_id
 
     def upgrade_deployment(self):

@@ -42,7 +42,8 @@ from urlparse import urlsplit, urljoin
 from datetime import datetime, timedelta
 from StringIO import StringIO
 import logging
-logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger('pyazure')
+log.setLevel(logging.WARN)
 try:
     # new in Python2.7
     from collections import OrderedDict
@@ -538,7 +539,7 @@ class ServiceManagementEndpoint(object):
         try:
             return ServiceManagementEndpoint._opener.open(request)
         except urllib2.HTTPError, e:
-            logging.debug('HTTP Response: %s %s', e.code, e.msg)
+            log.debug('HTTP Response: %s %s', e.code, e.msg)
             self._raise_wa_error(e)
 
     def get_operation_status(self, request_id):
@@ -635,14 +636,27 @@ class HTTPSClientAuthHandler(urllib2.HTTPSHandler):
         # Rather than pass in a reference to a connection class, we pass in
         # a reference to a function which, for all intents and purposes,
         # will behave as a constructor
+#        if not req.has_header(MANAGEMENT_VERSION_HEADER):
+#            req.headers[MANAGEMENT_VERSION_HEADER] = MANAGEMENT_VERSION
+#        if req.has_data() and not req.has_header('Content-Type'):
+#            req.headers['Content-Type'] = 'application/xml'
+#        if not req.has_header('Content-Type'):
+#            req.headers['Content-Type'] = ''
         if not req.has_header(MANAGEMENT_VERSION_HEADER):
-            req.headers[MANAGEMENT_VERSION_HEADER] = MANAGEMENT_VERSION
-        if req.has_data() and not req.has_header('Content-Type'):
-            req.headers['Content-Type'] = 'application/xml'
-        if not req.has_header('Content-Type'):
-            req.headers['Content-Type'] = ''
-        logging.debug('Request: %s; %s; %s; %s;', req.get_method(),
-            req.get_full_url(), req.headers, req.get_data())
+            req.add_header(MANAGEMENT_VERSION_HEADER, MANAGEMENT_VERSION)
+        if req.has_data():
+            if req.has_header('Content-type'):
+                # some versions of urllib2 silently add a
+                # Content-type: x-www-form-urlencoded unredirected header,
+                # and sadly the urllib2.Request implementation has terrible
+                # header handling, so here we overwrite that value.
+                req.add_unredirected_header('Content-type', 'application/xml')
+            req.add_header('Content-type', 'application/xml')
+        if not req.has_header('Content-type'):
+            req.add_header('Content-type', '')
+        log.debug('Request: %s; %s; %s; %s; %s;', req.get_method(),
+            req.get_full_url(), req.headers, req.unredirected_hdrs,
+            req.get_data())
         return self.do_open(self.getConnection, req)
     
     def getConnection(self, host, *args, **kargs):

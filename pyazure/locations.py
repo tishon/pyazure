@@ -27,8 +27,6 @@ License:
 """
 
 import httplib
-import logging
-logging.basicConfig(level=logging.DEBUG)
 try:
     from lxml import etree
 except ImportError:
@@ -40,7 +38,7 @@ from util import *
 class Locations(ServiceManagementEndpoint):
 
     def __init__(self, management_cert_path, subscription_id):
-        logging.debug('init locations')
+        log.debug('init locations')
         self.wasm_ops = []
         super(Locations, self).__init__(management_cert_path,
             subscription_id)
@@ -57,10 +55,10 @@ class Locations(ServiceManagementEndpoint):
         """The List Locations operation lists all of the data center locations
         that are valid for your subscription."""
 
-        logging.debug('Getting locations list')
+        log.debug('Getting locations list')
         req = RequestWithMethod('GET', self.base_url)
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.OK:
             self._raise_wa_error(res)
         ET = etree.parse(res)

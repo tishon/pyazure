@@ -27,8 +27,6 @@ License:
 """
 
 import httplib
-import logging
-logging.basicConfig(level=logging.DEBUG)
 try:
     from lxml import etree
 except ImportError:
@@ -43,7 +41,7 @@ class StorageAccounts(ServiceManagementEndpoint):
     wasm_ops = []
 
     def __init__(self, management_cert_path, subscription_id):
-        logging.debug('init storage accounts')
+        log.debug('init storage accounts')
         self.wasm_ops = self.get_wasm_ops()
         self._locations = None
         super(StorageAccounts, self).__init__(management_cert_path,
@@ -79,10 +77,10 @@ class StorageAccounts(ServiceManagementEndpoint):
         """The List Storage Accounts operation lists the storage accounts
         available under the current subscription."""
 
-        logging.debug('Getting storage accounts list')
+        log.debug('Getting storage accounts list')
         req = RequestWithMethod('GET', self.base_url)
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.OK:
             self._raise_wa_error(res)
         ET = etree.parse(res)
@@ -105,14 +103,14 @@ class StorageAccounts(ServiceManagementEndpoint):
         and the name of the affinity group to which the service belongs, or its
         geo-location if it is not part of an affinity group."""
         
-        logging.debug('Getting storage account properties')
+        log.debug('Getting storage account properties')
         req = RequestWithMethod('GET', '%s/%s' % (self.base_url, name))
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.OK:
             self._raise_wa_error(res)
         storage = etree.parse(res)
-        props = {}
+        props = OrderedDict()
         props['Url'] = storage.findtext('.//{%s}Url' % NAMESPACE_MANAGEMENT)
         props['ServiceName'] = storage.findtext('.//{%s}ServiceName'
             % NAMESPACE_MANAGEMENT)
@@ -139,10 +137,10 @@ class StorageAccounts(ServiceManagementEndpoint):
         """The Get Storage Keys operation returns the primary and secondary
         access keys for the specified storage account."""
  
-        logging.debug('Getting storage account keys')
+        log.debug('Getting storage account keys')
         req = RequestWithMethod('GET', '%s/%s/keys' % (self.base_url, name))
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.OK:
             self._raise_wa_error(res)
         storage = etree.parse(res)
@@ -172,7 +170,7 @@ class StorageAccounts(ServiceManagementEndpoint):
         if description and len(description) > 1024:
             raise ValueError(description,
                 'description must be <= 1024 chars')
-        logging.debug('Creating storage account: %s', name)
+        log.debug('Creating storage account: %s', name)
         req = RequestWithMethod('POST', self.base_url)
         req_body = OrderedDict()
         req_body['ServiceName'] = name
@@ -189,11 +187,11 @@ class StorageAccounts(ServiceManagementEndpoint):
         req_body = OrderedDict([('CreateStorageServiceInput',req_body)])
         req.add_data(build_wasm_request_body(req_body))
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.ACCEPTED:
             self._raise_wa_error(res)
         request_id = res.headers.getheader('x-ms-request-id')
-        logging.debug('Request-Id: %s' % request_id)
+        log.debug('Request-Id: %s' % request_id)
         return request_id
 
     wasm_ops.append(create_storage_account)
@@ -202,15 +200,15 @@ class StorageAccounts(ServiceManagementEndpoint):
         """The Delete Storage Account operation deletes the specified storage
         account from Windows Azure."""
 
-        logging.debug('Deleting storage account: %s', name)
+        log.debug('Deleting storage account: %s', name)
         req = RequestWithMethod('DELETE', '%s/%s' % (self.base_url,
             name))
         res = self.urlopen(req)
-        logging.debug('HTTP Response: %s %s', res.code, res.msg)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
         if res.code != httplib.OK:
             self._raise_wa_error(res)
         request_id = res.headers.getheader('x-ms-request-id')
-        logging.debug('Request-Id: %s' % request_id)
+        log.debug('Request-Id: %s' % request_id)
         return True
 
     wasm_ops.append(delete_storage_account)

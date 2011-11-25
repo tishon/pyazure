@@ -37,7 +37,8 @@ from table import TableStorage
 
 class PyAzure(object):
     """Class exposing Windows Azure storage and, if initialised appropriately,
-    service management operations."""
+    service management operations.    
+    """
 
     def __init__(self, storage_account_name=DEVSTORE_ACCOUNT,
             storage_account_key=None, use_path_style_uris=False,
@@ -131,7 +132,61 @@ class PyAzure(object):
 
 
 class WASM(object):
-    """Class exposing Windows Azure Service Management operations."""
+    """Class exposing Windows Azure Service Management operations.
+    
+    Using WASM
+    ----------
+    >>> import pyazure
+    >>> pa = pyazure.PyAzure(management_cert_path=MANAGEMENT_CERT, 
+    ... subscription_id=SUBSCRIPTION_ID)
+    >>> 'Anywhere Asia' in pa.wasm.list_locations()
+    True
+    >>> request_id = pa.wasm.create_storage_account('pyazuretest','doctest',
+    ... 'anywhere us', 'Here is my description, not great is it?')
+    >>> pa.wasm.wait_for_request(request_id)
+    True
+    >>> (pa.wasm.get_operation_status(request_id) == 
+    ... {'HttpStatusCode': '200', 'Status': 'Succeeded'})
+    True
+    >>> request_id = pa.wasm.create_storage_account(
+    ... 'pyazuretestwithaverylongname','doctest','anywhere us')
+    Traceback (most recent call last):
+        ...
+    ValueError: ('pyazuretestwithaverylongname', 'name must be between 3 and 24 characters in length and use numbers and lower-case letters only.')
+    >>> 'pyazuretest' in pa.wasm.list_storage_accounts()
+    True
+    >>> pa.wasm.create_service('pyazuretest','create service doctest',
+    ... 'anywhere europe')
+    True
+    >>> 'pyazuretest' in pa.wasm.list_services()
+    True
+    >>> pa.wasm.create_service('pyazuretest','create service doctest',
+    ... 'anywhere europe')
+    Traceback (most recent call last):
+        ...
+    WASMError: (409, 'ConflictError', 'The specified DNS name is already taken.')
+    >>> pa.wasm.create_service('pyazuretest','create service doctest' * 10,
+    ... 'anywhere europe') # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+        ...
+    ValueError: ('create service doctest...', 'label exceeds 100 char limit')
+    >>> pa.wasm.get_service_properties('pyazuretest') # doctest: +ELLIPSIS
+    ...                                   # doctest: +NORMALIZE_WHITESPACE
+    OrderedDict([('Url', 'http...'),
+                 ('ServiceName', 'pyazuretest'),
+                 ('HostedServiceProperties',
+                     OrderedDict([('Description', ''),
+                                  ('Location', 'Anywhere Europe'),
+                                  ('Label', 'create service doctest')]))])
+    >>> pa.wasm.delete_service('pyazuretest')
+    True
+    >>> pa.wasm.delete_storage_account('pyazuretest')
+    True
+    >>> pa.wasm.delete_storage_account('pyazuretest')
+    Traceback (most recent call last):
+        ...
+    WASMError: (404, 'ResourceNotFound', 'The requested storage account was not found.')
+    """
 
     def __init__(self, management_cert_path, subscription_id):
         from hostedservices import HostedServices, ServiceConfiguration
@@ -158,8 +213,49 @@ class WASM(object):
         for op in self.location_api.get_wasm_ops():
             setattr(self, op.__name__, op)
 
-def main():
-    pass
+def usage():
+    print (
+"""
+This module is an API, and as such is not designed to be run directly.
+However, there are embedded doctests which can executed by running pyazure.py
+and providing a Windows Azure subscription id and management certificate path
+as arguments, e.g., pyazure.py -s <subscription_id> -c <management_cert>
+
+Available docstrings for the top-level API follow:
+Service Management:
+%s
+Storage:
+%s
+""" % (PyAzure.__doc__, WASM.__doc__))
+    print usage.func_doc
 
 if __name__ == '__main__':
-    sys.exit(main())
+    import doctest
+    import getopt
+    try:
+        opts, _ = getopt.getopt(sys.argv[1:],
+            'hs:c:v',
+            ['help','subscription_id','management_cert','verbose'])
+    except getopt.GetoptError, e:
+        print str(e)
+        sys.exit(2)
+    sub_id = None
+    cert = None
+    loud = False
+    for opt, arg in opts:
+        if opt in ('-h','--help'):
+            usage()
+            sys.exit()
+        elif opt in ('-s','--subscription_id'):
+            sub_id = arg
+        elif opt in ('-c','--management_cert'):
+            cert = arg
+        elif opt in ('-v','--verbose'):
+            loud = True
+    if sub_id is None or cert is None:
+        usage()
+        sys.exit(2)
+    doctest.testmod(
+        extraglobs={'SUBSCRIPTION_ID':sub_id, 'MANAGEMENT_CERT':cert},
+        verbose = loud)
+    sys.exit()
