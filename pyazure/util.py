@@ -30,6 +30,7 @@ License:
 import base64
 import re
 import time
+import inspect
 import hmac
 import hashlib
 from urlparse import urlsplit
@@ -104,7 +105,10 @@ def parse_edm_double(input):
 
 def parse_edm_boolean(input):
     return input.lower() == "true"
-    
+
+def get_properties(obj):
+    return [m for m in inspect.getmembers(obj) if not m[0].startswith("__")]
+
 # Windows Azure Storage APIs classes
 ################################################################################
 class SharedKeyCredentials(object):

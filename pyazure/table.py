@@ -38,7 +38,11 @@ class Table(object):
         self.url = url
         self.name = name
 
-class TableEntity(object): pass
+class TableEntity(object):
+    def __init__(self, partition_key="", row_key="", timestamp=""):
+        self.PartitionKey = partition_key
+        self.RowKey = row_key
+        self.Timestamp = timestamp
 
 class TableStorage(Storage):
     '''Due to local development storage not supporting SharedKey authentication, this class
@@ -93,6 +97,27 @@ class TableStorage(Storage):
             
             for table in self._get_tables(request):
                 yield table
+
+    def insert_entity(self, table_name, entity):
+        raw_properties = get_properties(entity)
+        # TODO:
+        # convert properties to xml (mind namespaces)
+        properties = []
+
+        data = """<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<entry xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns="http://www.w3.org/2005/Atom">
+  <title />
+  <updated>%s<updated/>
+  <author>
+    <name />
+  </author>
+  <id />
+  <content type="application/xml">
+    <m:properties>
+      %s
+    </m:properties>
+  </content>
+</entry>"""  % (time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()), properties)
 
     def get_entity(self, table_name, partition_key, row_key):
         request_object = Request("%s/%s(PartitionKey='%s',RowKey='%s')" % \
