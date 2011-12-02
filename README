@@ -10,3 +10,5 @@ There is a project with the same name on Google Code, but it seems abandoned:
 http://code.google.com/p/pyazure/
 
 Management API functionality written and integrated by Blair Bethwaite (bmb@github.com).
+
+N.B. There is a bug in CPython 2.7 running on Windows, which prevents the management API functionality to work correctly. For more details, see http://stackoverflow.com/questions/8342714/python-https-against-azure-service-management-api-fails-on-windows
